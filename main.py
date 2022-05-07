@@ -13,7 +13,8 @@ from datetime import datetime
 
 
 
- 
+#Data Logging txt Files
+
 file = open("data","r+")
 file.truncate(0)
 file.close()
@@ -22,29 +23,14 @@ file = open("GPS","r+")
 file.truncate(0)
 file.close()
 
-'''
-file = open("data2","r+")
-file.truncate(0)
-file.close()
-'''
-
+#Global Variables
 latitude=0
 longitude=0
 imu=0
- 
-
- 
-
- 
 c=0
 now=0
- 
-#from geographiclib.geodesic import Geodesic
 
-#import RPi.GPIO as GPIO
-
-
-
+#Raspberry Pi Digital Pins for Motor Control
 
 in1=24
 in2=23
@@ -58,15 +44,13 @@ enc=26
 in5=5
 in6=6
 
-
 end=16
 in7=7
 in8=8
 
-
+#Define GPIO Pins as Outputs 
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-
 
 GPIO.setup(in1,GPIO.OUT)
 GPIO.setwarnings(False)
@@ -95,9 +79,6 @@ GPIO.setwarnings(False)
 GPIO.setup(enb,GPIO.OUT)
 GPIO.setwarnings(False)
 
-
-
-
 GPIO.setup(in7,GPIO.OUT)
 GPIO.setwarnings(False)
 
@@ -108,8 +89,7 @@ GPIO.setup(end,GPIO.OUT)
 GPIO.setwarnings(False)
 
 
-
-
+#Set GPIO pins to LOW
 
 GPIO.output(in1,GPIO.LOW)
 GPIO.setwarnings(False)
@@ -136,6 +116,8 @@ GPIO.output(in8,GPIO.LOW)
 GPIO.setwarnings(False)
 
 
+#Assign PWM GPIO pins and set Frequency to 25Hz
+
 p=GPIO.PWM(en,25)
 p2=GPIO.PWM(enb,25)
 p3=GPIO.PWM(enc,25)
@@ -145,21 +127,18 @@ p4=GPIO.PWM(end,25)
 
 
 
+#Desired Destination
 
-#coords_1 = (54.9792, -1.6147) #Desired Destination
-#coords_1 = (90, 0) #Desired Destination
+#coords_1 = (54.9792, -1.6147) 
+#coords_1 = (90, 0) 
 #coords_1 =(54.979616352, -1.61617874392)
-
 #coords_1 = ( 54.978140, -1.622371 )
-
 #coords_1 = (54.97813017, -1.6224125)
-
 #coords_1 = (54.97813033, -1.62239233)
-
 coords_1 =(54.978200,-1.622482)
 
 
-
+#Bearing Between 2 Points 
 def calculate_initial_compass_bearing(pointA, pointB):
 
     if (type(pointA) != tuple) or (type(pointB) != tuple):
@@ -182,6 +161,8 @@ def calculate_initial_compass_bearing(pointA, pointB):
 
 
 
+#Get GPS data from USB Serial Port (in NMEA format). 
+#GPS Data is saved on global variables latitude and longitude
 
 def GPS1():
     
@@ -201,8 +182,9 @@ def GPS1():
    
   
   
-  
-
+ 
+#Get IMU rotation angle data, from I2C port
+#Update global variable imu
 def IMU():
     
     i2c = board.I2C()
@@ -223,7 +205,7 @@ def IMU():
 
 
 
-
+#Calculate Magnetic Declination based on WMM2020
 def calculate_field_value(result):
     """Get and print field value."""
     field_value = result['field-value']
@@ -233,7 +215,7 @@ def calculate_field_value(result):
     return(declination['value'])
 
 
-
+#Calculate great circle distance between 2 points 
 def haversine(cord1, cord2):
     """
     Calculate the great circle distance in kilometers between two points
@@ -263,9 +245,12 @@ def haversine(cord1, cord2):
 
 
 
-
+#Error equations for PD Controller
 def errorCalc(b,imu1):
-    er=0
+  #b is desired bearing
+  #imu1 is current heading 
+  #er is the error between the 2 angles
+  er=0
     
     if(0<b<90):
         if(0<=imu1<=90):
@@ -349,87 +334,44 @@ def errorCalc(b,imu1):
 
 
 
-            
+#Main Control Loop            
 def control():
     
     start_time = time.time()
     
     errorsum=0
     lastError=0
-    
     error=0
-    
     direction=0
     c=0.05
-    
     kp=130
     kd=23.4
-    ki=0
-
-    '''
-    80, kd=20,ki=5
-
-    #ku=250
-    #tu=1.25
-    
-    #ku=200
-    #tu=1.412 (1.4)
-    
-    p--> 0.6*Ku
-    ti-->0.5*Tu
-    td-->0.125*Tu
-
-    Kp=K
-    Ki=K/ti
-    Kd=K*td
-    '''
-    
+    ki=0  
     global now
-    
     loop=0
     error4=0
     now1=time.time()
     j=0
-    
+ 
+ 
     Avrage_Distance=[0]*10
     
+   
+   
+   
     while (True):
+     
         now=time.time()
-        
         t=time.time()-now1
         t = "{:.3f}".format(t)
-        
-        
         dt=c
 
-    
-        #print("IMU: "+str(imu))
-        
-        
-        
+                 
         gps_coord=(latitude,longitude)
         
-        #Distance=(float(geopy.distance.distance(coords_1, gps_coord).m))
         Distance=float(haversine(coords_1, gps_coord))*1000
         
         Bearing=(int(calculate_initial_compass_bearing((gps_coord),(coords_1))))#Bearing from North
-        
-        
-        """
-        calculator = MagneticFieldCalculator()
-        
-        wmm_calc_result = calculator.calculate(
-            latitude=gps_coord[0],
-            longitude=gps_coord[1],
-            altitude=0,
-            date=datetime.today().strftime('%Y-%m-%d')
-        )
-        """
-        #print((calculate_field_value(wmm_calc_result)))
-        
-        #Bearing= Bearing +calculate_field_value(wmm_calc_result)
-        
-
         
         b=Bearing
         
@@ -438,53 +380,28 @@ def control():
          
         Avrage_Distance[j]=(Distance)
         Distance=sum(Avrage_Distance)/10
-        
-         
-        Distance_error=abs(2-Distance)*10
-        if (Distance_error>50):
-            Distance_error=50
-         
-            
+                     
         print("Distance: ",Distance,"m ","Bearing: ",Bearing,"° ","IMU",imu)
-        
-         
-        #print(str(loop)+'###')
-        
-        
-        """
-        if(loop<100):
-            b=270
-        else:
-            b=180
-            print(t)
-         
-        
-        if(loop>=200):
-            loop=0
-        
-        #print(loop)
-        """
-        
          
         error=errorCalc(b,imu)
 
 
        
-         
+        
         b1=b+90
         if (b1>360):
             b1-=360
         b2=b-90
         if (b2<0):
             b2+=360
-        
+
         if(b1>b2):
         
             if(b2<imu<b1):
                 direction=2 #Backwards
             else:
                 direction=1 #Forward
-                
+               
         else:
             
             if(b1<imu<b2):
@@ -500,28 +417,13 @@ def control():
        ### CCW is negative CW is positive
         
         error=error*1/9
-        
-        #integral clamping
-        """
-        if(ki*errorsum<=95 and ki*errorsum>=-95):
-            errorsum+=(error*dt)
-        
-        else:
-            errorsum=errorsum
-        
-        """
-        
-        errorsum+=(error*dt)
-        
+              
         Derror=(error-lastError)/dt
         
         lastError=error
-         
         
         E = kp * error  + kd * Derror
-            
-        
-        
+                    
         
         if(E<0):
             E1=E-12
@@ -556,10 +458,8 @@ def control():
             GPIO.output(in1,GPIO.LOW)
             GPIO.output(in2,GPIO.LOW)
         
-        #print(direction)
             
-        #dist_error=Distance*50
-        dist_error=0  
+        dist_error=Distance*50
             
         if(Distance>0.5):
             
@@ -567,7 +467,7 @@ def control():
                 p3.start(40)
                 GPIO.output(in5,GPIO.HIGH)
                 GPIO.output(in6,GPIO.LOW)
-                
+           
                 p4.start(40)
                 GPIO.output(in7,GPIO.LOW)
                 GPIO.output(in8,GPIO.HIGH)
@@ -604,19 +504,6 @@ def control():
                 GPIO.output(in8,GPIO.LOW)
                 
         
-        """  
-        else:
-                p3.start(0)
-                GPIO.output(in5,GPIO.LOW)
-                GPIO.output(in6,GPIO.LOW)
-                
-                p4.start(0)
-                GPIO.output(in7,GPIO.LOW)
-                GPIO.output(in8,GPIO.LOW)
-        """
-          
-         
-        
         E="{:.3f}".format(E)
         #print("PID Error: ",E)
         
@@ -637,17 +524,7 @@ def control():
         else:
             continue 
         
-        c=time.time()-now
-        loop+=1
-        
-        #print(c)
-        if(c>0.055):
-            print(c)
-        #print(loop)
-        print("")
-        #print(dt)
-        
-        j+=1
+        c=time.time()-now       
     
     
     
@@ -668,13 +545,5 @@ if __name__ == "__main__":
     main()
 
 
-
-
- 
-
-
-       #SOSOSOS #https://stackoverflow.com/questions/1878907/how-can-i-find-the-difference-between-two-angles
-        #https://www.electronicshub.org/raspberry-pi-l298n-interface-tutorial-control-dc-motor-l298n-raspberry-pi/
-        #https://www.youtube.com/watch?v=2bganVdLg5Q
 
 
