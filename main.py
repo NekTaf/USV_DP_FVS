@@ -245,7 +245,7 @@ def haversine(cord1, cord2):
 
 
 
-#Error equations for PD Controller
+#Error equations for PD Controller, calculates closest angle between desired bearing and actual heading
 def errorCalc(b,imu1):
   #b is desired bearing
   #imu1 is current heading 
@@ -337,8 +337,8 @@ def errorCalc(b,imu1):
 #Main Control Loop            
 def control():
     
+    #Variables
     start_time = time.time()
-    
     errorsum=0
     lastError=0
     error=0
@@ -353,20 +353,21 @@ def control():
     now1=time.time()
     j=0
  
- 
+    #Sums last 10 calculated distances 
     Avrage_Distance=[0]*10
     
    
    
    
     while (True):
-     
+        
+        #Time Logger
         now=time.time()
         t=time.time()-now1
         t = "{:.3f}".format(t)
         dt=c
 
-                 
+        #Call Bearing and Distance functions
         gps_coord=(latitude,longitude)
         
         Distance=float(haversine(coords_1, gps_coord))*1000
@@ -387,6 +388,7 @@ def control():
 
 
        
+        #Depending on current heading and bearing, set USV to move forwards or in reverse 
         
         b1=b+90
         if (b1>360):
@@ -411,11 +413,7 @@ def control():
 
         
  
-       
-       
-        
-       ### CCW is negative CW is positive
-        
+        #PD controller
         error=error*1/9
               
         Derror=(error-lastError)/dt
@@ -425,6 +423,7 @@ def control():
         E = kp * error  + kd * Derror
                     
         
+        #Adjust thruster speed for turning
         if(E<0):
             E1=E-12
             if(E1<-100):
@@ -458,6 +457,9 @@ def control():
             GPIO.output(in1,GPIO.LOW)
             GPIO.output(in2,GPIO.LOW)
         
+            
+            
+        #Adjust thruster speed for moving forwards or reverse    
             
         dist_error=Distance*50
             
@@ -505,19 +507,18 @@ def control():
                 
         
         E="{:.3f}".format(E)
-        #print("PID Error: ",E)
+
         
         
         if(0<=imu<=360):
             with open("data", "a") as datafile:
                 datafile.write(str(imu)+" "+str(t)+"\n")   
-        '''        
-        with open("data2", "a") as datafile:
-            datafile.write(str(E)+" "+str(t)+"\n")
-        '''   
+
         with open("GPS", "a") as datafile:
             datafile.write(str(gps_coord[0])+" "+str(gps_coord[1])+"\n")
 
+            
+        #Set stable dt, wait until time elapsed is 0.05 sec from start of loop   
         
         if(-time.time()+0.05+now>0):
             sleep(0.05-time.time()+now)
@@ -528,14 +529,15 @@ def control():
     
     
     
+    
 def main():
+    
+    #Start Control Loop and Sensor threads
     
     Thread(target = IMU).start()
     
-    
     Thread(target = GPS1).start()
-    sleep(2)
-    
+    sleep(2) #Wait a few seconds for IMU to initialise
     
     Thread(target = control).start()
     
